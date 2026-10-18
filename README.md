@@ -265,7 +265,7 @@ the same files. Each core guard was checked by removing it and confirming that a
 
 ## Unfinished work
 
-Time spent: _TODO (author): hours_, within the six-hour limit.
+Time spent: 3 hours, within the six-hour limit.
 
 Not done, roughly in the order I'd do them next:
 - **Background reconciler.** Reconcile only runs at startup and on `POST /reconcile`. Next
@@ -286,4 +286,4 @@ Not done, roughly in the order I'd do them next:
 
 ## How AI tools were used
 
-_TODO (author): describe how AI tools were used in building this project._
+I used an AI coding agent (Claude Code) to generate the code, the tests and the documentation, and to find and fix bugs. I supervised it the whole way rather than handing it the task. I first had it write the requirements, the design rules and a plan before any code. Then it built the service one phase at a time: database and models, mock broker, submission, timeouts, broker updates, reconciliation, then API and logging. After each phase it stopped and waited for my approval before starting the next. It also had to explain each design choice and ask me before deciding anything itself, such as whether a kill-switched signal is stored or refused, or what happens to a signal blocked by the kill switch. That way I made all the architectural decisions and could see exactly what it was doing and why. It also had to prove its work by running the tests and showing the output. That surfaced real bugs, including a race where a stale reconciler could send a retried order twice and a Decimal rounding issue that let an order just over the limit pass the risk check. Each was fixed with a test that fails without the fix. When the work was done, I reviewed the code against the original brief myself and found some gaps: the field was called “symbol” instead of “instrument”, there was no end-to-end test for the configurable limit, and some documentation was missing or out of date. I had the agent fix those, and it did so correctly on the first try.
