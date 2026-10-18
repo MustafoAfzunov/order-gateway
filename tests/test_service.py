@@ -82,7 +82,7 @@ def test_duplicate_with_equal_decimal_spelling_is_a_duplicate(service, broker):
 
 
 @pytest.mark.parametrize("changed", [{"qty": "3"}, {"price": "101"}, {"side": "SELL"},
-                                     {"symbol": "MSFT"}])
+                                     {"instrument": "MSFT"}])
 def test_same_signal_id_with_different_payload_raises_conflict(service, broker, changed):
     service.submit(signal())
     with pytest.raises(SignalConflict):
@@ -158,8 +158,8 @@ def test_new_row_left_by_a_crash_is_resumed_on_resubmit(service, broker, db_path
     # Simulate a crash between INSERT and the claim: the row is NEW, the broker was never called.
     with connection(db_path) as c:
         c.execute(
-            "INSERT INTO orders (signal_id, client_order_id, symbol, side, qty, reference_price,"
-            " status, created_at, updated_at)"
+            "INSERT INTO orders (signal_id, client_order_id, instrument, side, qty,"
+            " reference_price, status, created_at, updated_at)"
             " VALUES ('sig-1', 'CO-sig-1', 'AAPL', 'BUY', '2', '100', 'NEW', 't', 't')"
         )
     assert service.submit(signal()).status is S.ACCEPTED

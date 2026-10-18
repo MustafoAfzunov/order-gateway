@@ -4,7 +4,7 @@ A small service that receives trading signals and sends them to a (mock) broker,
 that **a signal never becomes two broker orders**, and so that a crash, a timeout or a
 misbehaving broker feed leaves the system in a state it can recover from.
 
-Python 3.11+ · FastAPI · Pydantic v2 · stdlib `sqlite3` (no ORM) · pytest · `Decimal` for all
+Python 3.12 (tested; 3.11+ should work, untested) · FastAPI · Pydantic v2 · stdlib `sqlite3` (no ORM) · pytest · `Decimal` for all
 money and quantities.
 
 ---
@@ -15,7 +15,7 @@ money and quantities.
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 
-# run the tests (231 tests, ~5 s)
+# run the tests (233 tests, ~5 s)
 .venv/bin/pytest -q
 
 # run the API
@@ -36,7 +36,7 @@ On startup the app creates its tables and runs `reconcile()` before it accepts r
 ```bash
 # submit a signal (sending it again returns the same order and doesn't create a second one)
 curl -s -X POST localhost:8000/signals -H 'content-type: application/json' \
-  -d '{"signal_id":"s1","symbol":"AAPL","side":"BUY","qty":"10","reference_price":"150.25"}'
+  -d '{"signal_id":"s1","instrument":"AAPL","side":"BUY","qty":"10","reference_price":"150.25"}'
 
 # the order plus its full event log
 curl -s localhost:8000/orders/s1
@@ -203,6 +203,21 @@ the same files. Each core guard was checked by removing it and confirming that a
 
 ---
 
+## What the tests prove
+
+| Required demonstration | Tests |
+|---|---|
+| Duplicate signals → one broker order | `test_service.py::test_duplicate_submission_produces_one_broker_order`, `test_api.py::test_duplicate_post_returns_same_order_and_one_broker_order` |
+| Simultaneous signals → one broker order | `test_service.py::test_concurrent_submissions_same_signal_produce_one_broker_order` (10 threads), `test_service.py::test_atomic_claim_lets_only_one_of_n_racing_callers_reach_broker` (all threads forced to see `NEW` before any claims) |
+| Accepted + timeout → no duplicate | `test_timeouts.py::test_accept_then_timeout_resolves_from_broker_without_second_place_order` |
+| Restart after that timeout recovers the order | `test_reconcile.py::test_timeout_then_restart_reconcile_recovers_without_duplicate`, `test_reconcile.py::test_crash_during_broker_call_recovers_order_the_broker_has`, `test_api.py::test_startup_reconciles_orders_left_unresolved` |
+| Replayed partial fill not counted twice | `test_updates.py::test_replayed_partial_fill_leaves_filled_qty_unchanged` |
+| Older update doesn't reverse a completed order | `test_updates.py::test_older_update_after_filled_leaves_order_filled`, `test_updates.py::test_seq_2_before_seq_1_applies_2_and_ignores_1` |
+| Order-value limit | `test_service.py::test_over_limit_is_rejected_and_never_reaches_broker`, `test_service.py::test_at_limit_is_accepted`, `test_api.py::test_max_order_value_is_configurable_via_env`, `test_service.py::test_value_just_over_limit_is_not_rounded_down_to_the_limit` |
+| Kill switch | `test_service.py::test_kill_switch_on_blocks_submission`, `test_reconcile.py::test_kill_switch_on_reconcile_still_updates_existing_orders`, `test_api.py::test_kill_switch_blocks_signals_but_reads_updates_and_reconcile_work`, `test_api.py::test_kill_switch_stays_on_across_restart` |
+
+---
+
 ## Limitations (honest list)
 
 - **SQLite allows one writer at a time.** Writes are serialised. `busy_timeout` is 5 s, and
@@ -245,6 +260,27 @@ the same files. Each core guard was checked by removing it and confirming that a
 - **Updates for unknown orders are logged but not stored** (`order_events` needs an order row).
 - The test client prints a `StarletteDeprecationWarning` about `httpx`, which comes from the
   library versions.
+
+---
+
+## Unfinished work
+
+Time spent: _TODO (author): hours_, within the six-hour limit.
+
+Not done, roughly in the order I'd do them next:
+- **Background reconciler.** Reconcile only runs at startup and on `POST /reconcile`. Next
+  step: an `asyncio` task in the FastAPI lifespan calling `reconcile()` every N seconds (safe
+  alongside live requests thanks to the in-flight check and the version check on updates).
+- **Retry cap.** `submit_attempts` is counted, but nothing stops resending after N attempts.
+  Next step: check it in `resolve_unknown()` and hold the order for manual review.
+- **Hold for review after a kill-switch period,** instead of resending skipped `UNKNOWN`
+  orders automatically.
+- **Cancel / amend / expiry** (state machine, broker, API).
+- **Schema migrations.** Delete old `.db` files after upgrading (e.g. the `symbol` →
+  `instrument` rename).
+- **Auth** on the API, at least on `/kill-switch` and `/broker/updates`.
+- **Store updates for unknown orders** in a table rather than only logging them.
+- **Python 3.11** run of the test suite (developed and tested on 3.12 only).
 
 ---
 

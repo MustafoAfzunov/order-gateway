@@ -1,4 +1,8 @@
-# Plan (draft, awaiting approval)
+# Design notes
+
+The design as built, phase by phase. It started as the phase-0 plan; decisions that
+changed during implementation are struck through and point to what replaced them, so the
+reasoning trail is kept. The README is the short version.
 
 ## 1. Module layout
 ```
@@ -27,7 +31,7 @@ CREATE TABLE orders (
   id               INTEGER PRIMARY KEY,
   signal_id        TEXT NOT NULL UNIQUE,
   client_order_id  TEXT NOT NULL UNIQUE,            -- 'CO-' || signal_id
-  symbol           TEXT NOT NULL,
+  instrument       TEXT NOT NULL,
   side             TEXT NOT NULL CHECK (side IN ('BUY','SELL')),
   qty              TEXT NOT NULL,                   -- Decimal as text
   reference_price  TEXT NOT NULL,                   -- Decimal as text
@@ -134,7 +138,7 @@ Logs (`app/logging_setup.py`): one key=value line per event. `signal_id=` and
 `client_order_id=` are on every line ('-' when not applicable), so `grep signal_id=X` tells
 one instruction's story. Lines written inside a transaction are emitted only after COMMIT.
 
-## 5. Decisions needing your approval
+## 5. Design decisions (and how they changed)
 1. ~~Over-limit signals are stored as `REJECTED`.~~ **Superseded in phase 3 (user's spec):**
    stored as `REJECTED_RISK` with a reason, separate from broker `REJECTED`.
 2. ~~Kill switch refuses without storing.~~ **Superseded in phase 3 (user's spec):** the signal is
@@ -154,51 +158,7 @@ one instruction's story. Lines written inside a transaction are emitted only aft
 6. **Out of scope:** cancels, amendments, order expiry, multiple processes or hosts (SQLite plus
    one process is assumed; the claim is still safe across processes sharing the file).
 
-## 6. Test list
-**Submission / idempotency**
-- test_submit_new_signal_places_one_broker_order
-- test_duplicate_submission_returns_existing_and_no_second_broker_order
-- test_same_signal_id_different_payload_returns_409
-- test_concurrent_submissions_same_signal_produce_one_broker_order (20 threads, barrier, separate connections)
-- test_claim_only_one_caller_gets_rowcount_one
-- test_submitting_is_committed_before_broker_call (broker spy reads gateway.db from its own connection)
+## 6. Tests
 
-**Broker responses**
-- test_broker_accept_sets_accepted
-- test_broker_reject_sets_rejected_with_reason
-- test_broker_partial_fill_sets_partially_filled
-- test_broker_fill_sets_filled
-- test_mock_broker_idempotent_on_client_order_id
-
-**Timeouts**
-- test_timeout_after_accept_resolved_by_get_order_without_resend
-- test_timeout_before_accept_resends_with_same_client_order_id
-- test_get_order_called_before_any_retry (call-order spy)
-- test_retry_cap_leaves_order_unknown
-
-**Broker updates**
-- test_duplicate_update_does_not_double_count_fill
-- test_out_of_order_update_is_ignored
-- test_terminal_order_ignores_later_updates (FILLED then late partial; REJECTED then accept)
-- test_decreasing_cumulative_fill_is_rejected
-- test_fill_exceeding_qty_is_rejected
-- test_invalid_transition_raises
-
-**Restart / reconciliation**
-- test_state_survives_restart
-- test_restart_moves_submitting_to_unknown_and_reconciles
-- test_crash_after_broker_accept_recovers_without_duplicate (broker has 1 order after restart)
-- test_reconcile_applies_missed_fills
-
-**Risk / kill switch**
-- test_order_value_over_limit_rejected_without_broker_call
-- test_order_value_exactly_at_limit_is_allowed
-- test_max_order_value_is_configurable
-- test_order_value_uses_decimal_exactly (e.g. 0.1 × 3)
-- test_kill_switch_blocks_new_submissions
-- test_kill_switch_allows_reads_updates_and_reconcile
-- test_kill_switch_persists_across_restart
-
-**Logs**
-- test_every_transition_writes_order_event
-- test_ignored_update_is_logged_with_reason
+The phase-0 test list was replaced by the real suite in `tests/` (one file per concern). The
+README's "What the tests prove" table maps each required demonstration to its tests.

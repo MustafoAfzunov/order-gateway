@@ -117,7 +117,7 @@ class OrderService:
                 except SignalConflict:
                     self._log_line(order, "SIGNAL_CONFLICT", logging.WARNING,
                               qty=signal.qty, reference_price=signal.reference_price,
-                              side=signal.side.value, symbol=signal.symbol)
+                              side=signal.side.value, instrument=signal.instrument)
                     raise
                 self._log_line(order, "DUPLICATE", status=order.status.value)
             if order.status is not S.NEW:
@@ -365,7 +365,7 @@ class OrderService:
         self._log_line(order, "BROKER_SEND", attempt=order.submit_attempts)
         try:
             broker_order = self.broker.place_order(
-                order.client_order_id, order.symbol, order.side.value,
+                order.client_order_id, order.instrument, order.side.value,
                 order.qty, order.reference_price,
             )
         except BrokerTimeout:
@@ -476,18 +476,18 @@ class OrderService:
         now = self.now()
         with self._tx(conn) as pending:
             cur = conn.execute(
-                "INSERT INTO orders (signal_id, client_order_id, symbol, side, qty,"
+                "INSERT INTO orders (signal_id, client_order_id, instrument, side, qty,"
                 " reference_price, status, created_at, updated_at)"
                 " VALUES (?, ?, ?, ?, ?, ?, 'NEW', ?, ?)"
                 " ON CONFLICT(signal_id) DO NOTHING",
-                (signal.signal_id, signal.client_order_id, signal.symbol, signal.side.value,
+                (signal.signal_id, signal.client_order_id, signal.instrument, signal.side.value,
                  str(signal.qty), str(signal.reference_price), now, now),
             )
             inserted = cur.rowcount == 1
             if inserted:
                 self._record_event(conn, cur.lastrowid, signal.signal_id, signal.client_order_id,
                                 "RECEIVED", None, S.NEW,
-                                {"symbol": signal.symbol, "side": signal.side.value,
+                                {"instrument": signal.instrument, "side": signal.side.value,
                                  "qty": str(signal.qty),
                                  "reference_price": str(signal.reference_price)},
                                 pending)
@@ -595,8 +595,8 @@ class OrderService:
     @staticmethod
     def _check_same_payload(order: Order, signal: Signal) -> None:
         # Compare as Decimals, so "10" and "10.0" count as the same quantity.
-        same = (order.symbol, order.side, order.qty, order.reference_price) == (
-            signal.symbol, signal.side, signal.qty, signal.reference_price)
+        same = (order.instrument, order.side, order.qty, order.reference_price) == (
+            signal.instrument, signal.side, signal.qty, signal.reference_price)
         if not same:
             raise SignalConflict(f"signal_id {signal.signal_id} already exists with other values")
 

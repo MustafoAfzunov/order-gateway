@@ -279,7 +279,7 @@ def test_reconcile_does_not_query_terminal_orders(service, broker, db_path, monk
 
 def test_new_order_not_at_broker_is_left_new_and_not_sent(service, broker, db_path):
     with connection(db_path) as c:  # crash between INSERT and claim
-        c.execute("INSERT INTO orders (signal_id, client_order_id, symbol, side, qty,"
+        c.execute("INSERT INTO orders (signal_id, client_order_id, instrument, side, qty,"
                   " reference_price, status, created_at, updated_at)"
                   " VALUES ('sig-1', 'CO-sig-1', 'AAPL', 'BUY', '2', '100', 'NEW', 't', 't')")
     [result] = service.reconcile()

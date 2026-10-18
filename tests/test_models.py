@@ -5,7 +5,7 @@ from pydantic import ValidationError
 
 from app.models import Side, Signal
 
-VALID = {"signal_id": "sig-1", "symbol": "AAPL", "side": "BUY", "qty": "10",
+VALID = {"signal_id": "sig-1", "instrument": "AAPL", "side": "BUY", "qty": "10",
          "reference_price": "100.25"}
 
 

@@ -26,8 +26,8 @@ def client(settings):
         yield c
 
 
-def body(signal_id="sig-1", qty="2", price="100", side="BUY", symbol="AAPL"):
-    return {"signal_id": signal_id, "symbol": symbol, "side": side, "qty": qty,
+def body(signal_id="sig-1", qty="2", price="100", side="BUY", instrument="AAPL"):
+    return {"signal_id": signal_id, "instrument": instrument, "side": side, "qty": qty,
             "reference_price": price}
 
 
@@ -152,3 +152,14 @@ def test_kill_switch_stays_on_across_restart(settings):
     with TestClient(create_app(settings)) as client:  # new process, same DB file
         assert client.post("/signals", json=body()).json()["status"] == "BLOCKED"
         assert client.app.state.broker.place_order_call_count == 0
+
+
+@pytest.mark.parametrize("limit, expected", [("200", "ACCEPTED"), ("199.99", "REJECTED_RISK")])
+def test_max_order_value_is_configurable_via_env(tmp_path, monkeypatch, limit, expected):
+    # End to end, as in production: no Settings object passed in; the app reads env at startup.
+    monkeypatch.setenv("DB_PATH", str(tmp_path / "gateway.db"))
+    monkeypatch.setenv("BROKER_DB_PATH", str(tmp_path / "broker.db"))
+    monkeypatch.setenv("MAX_ORDER_VALUE", limit)
+    with TestClient(create_app()) as client:
+        r = client.post("/signals", json=body(qty="2", price="100"))  # value 200
+        assert r.json()["status"] == expected

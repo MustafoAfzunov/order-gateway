@@ -12,7 +12,7 @@ NOW = "2026-01-01T00:00:00+00:00"
 def insert_order(conn, signal_id="sig-1", client_order_id=None, side="BUY",
                  status="NEW", qty="10", price="100.5"):
     cur = conn.execute(
-        "INSERT INTO orders (signal_id, client_order_id, symbol, side, qty, reference_price,"
+        "INSERT INTO orders (signal_id, client_order_id, instrument, side, qty, reference_price,"
         " status, created_at, updated_at) VALUES (?, ?, 'AAPL', ?, ?, ?, ?, ?, ?)",
         (signal_id, client_order_id or f"CO-{signal_id}", side, qty, price, status, NOW, NOW),
     )

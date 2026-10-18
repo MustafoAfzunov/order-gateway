@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS orders (
     -- which insert wins.
     signal_id        TEXT NOT NULL UNIQUE,
     client_order_id  TEXT NOT NULL UNIQUE,
-    symbol           TEXT NOT NULL,
+    instrument       TEXT NOT NULL,
     side             TEXT NOT NULL CHECK (side IN ('BUY', 'SELL')),
     qty              TEXT NOT NULL,
     reference_price  TEXT NOT NULL,

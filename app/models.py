@@ -66,7 +66,7 @@ class Signal(BaseModel):
 
     # Restricted characters because signal_id ends up inside client_order_id sent to the broker.
     signal_id: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_.:-]+$")
-    symbol: str = Field(min_length=1, max_length=32)
+    instrument: str = Field(min_length=1, max_length=32)
     side: Side
     # Decimal rejects NaN and Infinity by default in Pydantic v2; gt=0 rejects zero/negative.
     # max_digits bounds the input, so the risk check's multiplication can be done exactly
@@ -85,7 +85,7 @@ class Order(BaseModel):
     id: int
     signal_id: str
     client_order_id: str
-    symbol: str
+    instrument: str
     side: Side
     qty: Decimal
     reference_price: Decimal
